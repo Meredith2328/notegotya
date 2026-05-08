@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>notegotya·五线谱识谱练习玩具</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.2/dist/abcjs-basic-min.js"></script>
+</head>
+<body>
+
+<div class="container" id="container">
+  <div class="header-row">
+    <h1>五线谱识谱练习</h1>
+    <button class="gear-btn" id="gearBtn">设置 ⚙</button>
+  </div>
+  <p class="subtitle" id="clef-label">高音谱号 · C大调</p>
+
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="modeSolfege">唱名（do re mi）</button>
+    <button class="mode-btn" id="modeLetter">音名（C D E）</button>
+  </div>
+
+  <div class="timer-wrap"><div class="timer-bar" id="timerBar"></div></div>
+
+  <div class="main">
+    <div class="staff-panel" id="staffPanel"></div>
+
+    <div class="answer-panel">
+      <label for="answerInput" id="answerLabel">用空格分隔，从低到高，升降号写在音名后面（例：do# sib re）</label>
+      <input type="text" id="answerInput" placeholder="例: do# mi sol" autocomplete="off" autofocus>
+      <button class="btn" id="submitBtn">提交</button>
+      <div class="feedback" id="feedback"></div>
+    </div>
+  </div>
+
+  <div class="score-bar">
+    正确 <span id="correctCount">0</span>
+    &nbsp;·&nbsp;
+    错误 <span id="wrongCount">0</span>
+    &nbsp;·&nbsp;
+    总计 <span id="totalCount">0</span>
+  </div>
+  <div class="hint">回车或点击按钮提交 · 10 秒后自动展示答案 · 再次回车/点击进入下一题 @Github·Meredith2328</div>
+</div>
+
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <div class="settings-header">
+      <h2>练习设置</h2>
+      <button class="settings-close" id="settingsClose">✕</button>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-title">调号</div>
+      <div class="key-grid" id="keyGrid"></div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-title">谱号</div>
+      <div class="key-grid" id="clefGrid">
+        <button class="key-chip active" data-clef="treble">高音谱号</button>
+        <button class="key-chip active" data-clef="bass">低音谱号</button>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-title">音名</div>
+      <div class="quick-selects" id="quickSelects"></div>
+      <div class="note-grid" id="noteGrid"></div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-title">同时出现音数</div>
+      <div class="range-row">
+        <input type="number" id="chordMin" min="1" max="5" value="1" class="num-input">
+        <span class="range-sep">–</span>
+        <input type="number" id="chordMax" min="1" max="5" value="3" class="num-input">
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-title">倒计时</div>
+      <div class="timer-row">
+        <input type="number" id="timerDuration" min="0" max="120" value="10" class="num-input">
+        <span class="timer-hint">秒（0 = 不限时）</span>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <label class="toggle-row">
+        <input type="checkbox" id="endlessMode">
+        <span>无尽模式（不显示正确/错误计数）</span>
+      </label>
+    </div>
+
+    <div class="settings-actions">
+      <button class="btn" id="applySettings">应用设置</button>
+      <button class="btn btn-secondary" id="resetSettings">恢复默认</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
