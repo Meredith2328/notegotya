@@ -1,5 +1,7 @@
 # notegotya·五线谱识谱练习玩具
 
+在线试玩: https://meredith2328.github.io/notegotya/
+
 一个简单的五线谱识谱练习玩具，支持高音/低音谱号、调号、临时变音记号与和弦。
 
 ![demo](./demo.gif)
