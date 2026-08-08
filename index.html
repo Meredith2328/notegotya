@@ -12,6 +12,7 @@
 <div class="container" id="container">
   <div class="header-row">
     <h1>五线谱识谱练习</h1>
+    <button class="gear-btn" id="soundToggleBtn">🔇 声音</button>
     <button class="gear-btn" id="gearBtn">设置 ⚙</button>
   </div>
   <p class="subtitle" id="clef-label">高音谱号 · C大调</p>
@@ -65,6 +66,11 @@
     </div>
 
     <div class="setting-group">
+      <div class="setting-title">音域</div>
+      <div class="key-grid" id="registerGrid"></div>
+    </div>
+
+    <div class="setting-group">
       <div class="setting-title">音名</div>
       <div class="quick-selects" id="quickSelects"></div>
       <div class="note-grid" id="noteGrid"></div>
@@ -91,6 +97,13 @@
       <label class="toggle-row">
         <input type="checkbox" id="endlessMode">
         <span>无尽模式（不显示正确/错误计数）</span>
+      </label>
+    </div>
+
+    <div class="setting-group">
+      <label class="toggle-row">
+        <input type="checkbox" id="hideStaffMode">
+        <span>遮住谱面（听音模式，提交答案后显示谱面）</span>
       </label>
     </div>
 

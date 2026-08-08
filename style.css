@@ -118,6 +118,13 @@ h1 {
 
 .staff-panel svg { display: block; max-width: 100%; height: auto; }
 
+.staff-hidden-hint {
+  color: #8a7a5f;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 36px 18px;
+}
+
 /* ── answer panel ── */
 .answer-panel {
   flex: 0 0 240px;
@@ -210,6 +217,8 @@ h1 {
 }
 
 .gear-btn:hover { background: #ede6d6; }
+
+.gear-btn.active { background: #d4cbb5; border-color: #b9ac8e; }
 
 /* ── settings overlay ── */
 .settings-overlay {

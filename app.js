@@ -35,6 +35,17 @@ const BASS_NOTES = [
   { abc:'B,',  letter:'b' }, { abc:'C',   letter:'c' },
 ];
 
+// register slices per clef (inclusive pool indices)
+const REGISTER_RANGES = {
+  treble: { low: [0, 4], mid: [4, 8], high: [8, 12] },
+  bass:   { low: [0, 4], mid: [3, 7], high: [6, 10] },
+};
+const REGISTER_LABELS = { low: '低', mid: '中', high: '高' };
+const REGISTER_HINT = {
+  treble: { low: 'C3–G3', mid: 'G3–D4', high: 'D4–A4' },
+  bass:   { low: 'G1–D2', mid: 'C2–G2', high: 'F2–C3' },
+};
+
 // ═══════════════ dom refs ═══════════════
 const container   = document.getElementById('container');
 const clefLabel   = document.getElementById('clef-label');
@@ -75,6 +86,9 @@ const DEFAULT_SETTINGS = {
   chordMax:    3,
   timerSeconds: 10,
   endless:     false,
+  sound:       false,
+  hideStaff:   false,
+  registers:   ['low', 'mid', 'high'],
 };
 
 let settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
@@ -140,10 +154,28 @@ function randomExtraAccidental(letter, keySig) {
   }
 }
 
+// Random scale intervals between chord notes (in scale steps). Thirds stay
+// the most common, but fourths/fifths/sixths (and occasionally seconds) also
+// appear, so chords are not always stacked thirds.
+const CHORD_INTERVALS = [2, 3, 3, 3, 3, 4, 4, 5, 5, 6];
+
 function pickNotes(pool, count) {
   if (count === 1) {
     return [pool[randInt(0, pool.length - 1)]];
   }
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const start = randInt(0, pool.length - 1);
+    const out = [pool[start]];
+    let idx = start;
+    let ok = true;
+    for (let i = 1; i < count; i++) {
+      idx += CHORD_INTERVALS[randInt(0, CHORD_INTERVALS.length - 1)];
+      if (idx >= pool.length) { ok = false; break; }
+      out.push(pool[idx]);
+    }
+    if (ok) return out;
+  }
+  // fallback — stacked thirds, like before
   const maxStart = pool.length - (count - 1) * 2 - 1;
   if (maxStart < 0) {
     const start = randInt(0, pool.length - count);
@@ -153,6 +185,20 @@ function pickNotes(pool, count) {
   const out = [];
   for (let i = 0; i < count; i++) out.push(pool[start + i * 2]);
   return out;
+}
+
+function poolForClef(clef) {
+  const full = clef === 'treble' ? TREBLE_NOTES : BASS_NOTES;
+  const regs = settings.registers || [];
+  if (regs.length === 0) return full;
+  const idx = new Set();
+  regs.forEach(r => {
+    const rng = REGISTER_RANGES[clef] && REGISTER_RANGES[clef][r];
+    if (rng) for (let i = rng[0]; i <= rng[1]; i++) idx.add(i);
+  });
+  const pool = [];
+  idx.forEach(i => { if (i >= 0 && i < full.length) pool.push(full[i]); });
+  return pool.length > 0 ? pool : full;
 }
 
 function generateExercise() {
@@ -171,7 +217,7 @@ function generateExercise() {
   for (let attempt = 0; attempt < 80; attempt++) {
     const allowedClefs = settings.clefs.length > 0 ? settings.clefs : ['treble'];
     const clef = allowedClefs[randInt(0, allowedClefs.length - 1)];
-    const pool = clef === 'treble' ? TREBLE_NOTES : BASS_NOTES;
+    const pool = poolForClef(clef);
     const key = availableKeys[randInt(0, availableKeys.length - 1)];
     const keySig = KEYS[key];
     const chordSize = chordMin === chordMax ? chordMin : randInt(chordMin, chordMax);
@@ -191,7 +237,7 @@ function generateExercise() {
   // fallback — return last attempt anyway
   const fallbackClefs = settings.clefs.length > 0 ? settings.clefs : ['treble'];
   const clef = fallbackClefs[randInt(0, fallbackClefs.length - 1)];
-  const pool = clef === 'treble' ? TREBLE_NOTES : BASS_NOTES;
+  const pool = poolForClef(clef);
   const key = availableKeys[randInt(0, availableKeys.length - 1)];
   const keySig = KEYS[key];
   const chordSize = chordMin === chordMax ? chordMin : randInt(chordMin, chordMax);
@@ -330,6 +376,7 @@ function revealAnswer(userAnswer, isTimeout) {
   stopTimer();
   answerInput.disabled = true;
   submitBtn.textContent = '下一题';
+  if (settings.hideStaff) renderStaff(exercise);
   const correct = !isTimeout && userAnswer !== '' && check(userAnswer);
   showFeedback(userAnswer, correct, isTimeout);
   updateScore(correct);
@@ -380,10 +427,22 @@ modeLetter.addEventListener('click',  () => setAnswerMode('letter'));
 function loadExercise() {
   exercise = generateExercise();
   const clefText = exercise.clef === 'treble' ? '高音谱号' : '低音谱号';
-  clefLabel.textContent = clefText + ' · ' + KEY_LABELS[exercise.key];
+  let clefLabelText = clefText + ' · ' + KEY_LABELS[exercise.key];
+  const regs = (settings.registers || []).filter(r =>
+    REGISTER_RANGES[exercise.clef] && REGISTER_RANGES[exercise.clef][r]
+  );
+  if (regs.length > 0 && regs.length < 3) {
+    clefLabelText += ' · ' + regs.map(r => REGISTER_LABELS[r] + '音域').join('/');
+  }
+  clefLabel.textContent = clefLabelText;
   const scoreBar = document.querySelector('.score-bar');
   scoreBar.style.display = settings.endless ? 'none' : '';
-  renderStaff(exercise);
+  if (settings.hideStaff) {
+    staffPanel.innerHTML = '<p class="staff-hidden-hint">🎧 谱面已隐藏 · 提交答案后显示</p>';
+  } else {
+    renderStaff(exercise);
+  }
+  syncSoundUI();
   setPhase('answering');
   // reset scores when switching to endless mode
   if (settings.endless) {
@@ -398,12 +457,15 @@ const settingsOverlay = document.getElementById('settingsOverlay');
 const gearBtn        = document.getElementById('gearBtn');
 const keyGrid        = document.getElementById('keyGrid');
 const clefGrid       = document.getElementById('clefGrid');
+const registerGrid   = document.getElementById('registerGrid');
 const noteGrid       = document.getElementById('noteGrid');
 const quickSelects   = document.getElementById('quickSelects');
 const chordMinEl     = document.getElementById('chordMin');
 const chordMaxEl     = document.getElementById('chordMax');
 const timerDurEl     = document.getElementById('timerDuration');
 const endlessEl      = document.getElementById('endlessMode');
+const soundToggleBtn = document.getElementById('soundToggleBtn');
+const hideStaffModeEl = document.getElementById('hideStaffMode');
 
 function openSettings() {
   settingsDraft = JSON.parse(JSON.stringify(settings));
@@ -434,6 +496,19 @@ function renderSettingsPanel() {
     chip.classList.toggle('active', settingsDraft.clefs.includes(clef));
   });
 
+  // ── register chips ──
+  registerGrid.innerHTML = '';
+  ['low', 'mid', 'high'].forEach(r => {
+    const chip = document.createElement('button');
+    chip.className = 'key-chip' + (settingsDraft.registers.includes(r) ? ' active' : '');
+    chip.textContent = REGISTER_LABELS[r];
+    chip.title = '高音谱号 ' + REGISTER_HINT.treble[r] + ' · 低音谱号 ' + REGISTER_HINT.bass[r];
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('active');
+    });
+    registerGrid.appendChild(chip);
+  });
+
   // ── quick-select buttons ──
   quickSelects.innerHTML = '';
   const qsDefs = [
@@ -458,6 +533,7 @@ function renderSettingsPanel() {
   chordMaxEl.value = settingsDraft.chordMax;
   timerDurEl.value = settingsDraft.timerSeconds;
   endlessEl.checked = settingsDraft.endless;
+  hideStaffModeEl.checked = settingsDraft.hideStaff;
 }
 
 function setAllNotes(nat, sharp, flat) {
@@ -522,6 +598,15 @@ function applySettings() {
   });
   if (settingsDraft.clefs.length === 0) settingsDraft.clefs = ['treble'];
 
+  // register
+  settingsDraft.registers = [];
+  registerGrid.querySelectorAll('.key-chip.active').forEach(chip => {
+    const label = chip.textContent;
+    const entry = Object.entries(REGISTER_LABELS).find(([, v]) => v === label);
+    if (entry) settingsDraft.registers.push(entry[0]);
+  });
+  if (settingsDraft.registers.length === 0) settingsDraft.registers = ['low', 'mid', 'high'];
+
   // chord range
   let cMin = parseInt(chordMinEl.value) || 1;
   let cMax = parseInt(chordMaxEl.value) || 1;
@@ -536,8 +621,17 @@ function applySettings() {
   // endless
   settingsDraft.endless = endlessEl.checked;
 
+  // hide staff (listen mode)
+  settingsDraft.hideStaff = hideStaffModeEl.checked;
+
   // commit draft → settings
   settings = JSON.parse(JSON.stringify(settingsDraft));
+
+  // hiding the staff only makes sense when sound is on
+  if (settings.hideStaff && !settings.sound) {
+    settings.sound = true;
+    updateSoundToggleUI();
+  }
 
   closeSettings();
   loadExercise();
@@ -563,8 +657,202 @@ settingsOverlay.addEventListener('click', e => {
 document.getElementById('applySettings').addEventListener('click', applySettings);
 document.getElementById('resetSettings').addEventListener('click', resetSettings);
 
+// ═══════════════ piano sound (Web Audio, off by default) ═══════════════
+let audioCtx = null;
+let noiseBuffer = null;
+let masterCompressor = null;
+const activeNotes = new Set();
+
+function getAudioCtx() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!audioCtx) {
+    try {
+      audioCtx = new Ctx();
+      masterCompressor = audioCtx.createDynamicsCompressor();
+      masterCompressor.threshold.value = -14;
+      masterCompressor.knee.value = 18;
+      masterCompressor.ratio.value = 6;
+      masterCompressor.attack.value = 0.002;
+      masterCompressor.release.value = 0.18;
+      masterCompressor.connect(audioCtx.destination);
+    } catch (_) {
+      audioCtx = null;
+      masterCompressor = null;
+      return null;
+    }
+  }
+  if (audioCtx.state === 'suspended') {
+    try { audioCtx.resume(); } catch (_) {}
+  }
+  return audioCtx;
+}
+
+// ABC note string -> MIDI number (c = C4 in ABC convention)
+function abcToMidi(abc, pitchAcc) {
+  const letter = abc[0].toLowerCase();
+  const semis = { c:0, d:2, e:4, f:5, g:7, a:9, b:11 }[letter] ?? 0;
+  let octave = abc[0] === abc[0].toLowerCase() ? 4 : 3; // lowercase=oct4, uppercase=oct3
+  for (const ch of abc) {
+    if (ch === ',') octave -= 1;
+    if (ch === "'") octave += 1;
+  }
+  let midi = (octave + 1) * 12 + semis;
+  if (pitchAcc === '#') midi += 1;
+  if (pitchAcc === 'b') midi -= 1;
+  return midi;
+}
+
+function midiToFreq(midi) {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+// Piano-ish additive synthesis: 8 partials with slight inharmonicity,
+// double-string detuning, a hammer noise transient, damping lowpass,
+// and pitch-dependent decay (low notes ring longer).
+const PIANO_PARTIALS = [1, 2, 3, 4, 5, 6, 7, 8].map(n => ({
+  n,
+  a: Math.pow(0.72, n - 1),
+}));
+
+function getNoiseBuffer(ctx) {
+  if (!noiseBuffer || noiseBuffer.sampleRate !== ctx.sampleRate) {
+    const len = Math.floor(ctx.sampleRate * 0.12);
+    noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuffer;
+}
+
+function pianoDuration(freq) {
+  return Math.max(1.2, Math.min(5.0, 5.5 * Math.pow(130 / freq, 0.5)));
+}
+
+function playPianoNote(freq, when) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const dur = pianoDuration(freq);
+  const bright = Math.min(1, freq / 900);
+  const peak = 0.13 * (0.45 + 0.75 * bright);
+
+  const noteMaster = ctx.createGain();
+  noteMaster.connect(masterCompressor);
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = Math.min(6500, freq * 6 + 1300);
+  lp.Q.value = 0.4;
+  lp.connect(noteMaster);
+
+  const sources = [];
+  const envGains = [];
+
+  for (const p of PIANO_PARTIALS) {
+    // string inharmonicity: higher partials stretch slightly sharper
+    const f = freq * p.n * Math.sqrt(1 + 0.00045 * p.n * p.n);
+    const amp = peak * p.a;
+    for (const detune of [-1, 1]) {
+      const g = ctx.createGain();
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f;
+      o.detune.value = detune * 1.2; // cents — subtle double-string beating
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.001, amp / 2), when + 0.005); // attack
+      g.gain.exponentialRampToValueAtTime(Math.max(0.001, (amp / 2) * 0.35), when + 0.06); // initial decay
+      g.gain.exponentialRampToValueAtTime(0.0001, when + dur); // ringing tail
+      o.connect(g);
+      g.connect(lp);
+      o.start(when);
+      o.stop(when + dur + 0.05);
+      sources.push(o);
+      envGains.push(g);
+    }
+  }
+
+  // hammer: brief filtered noise burst at the attack
+  const nsrc = ctx.createBufferSource();
+  nsrc.buffer = getNoiseBuffer(ctx);
+  const ng = ctx.createGain();
+  ng.gain.setValueAtTime(0.09 * bright + 0.03, when);
+  ng.gain.exponentialRampToValueAtTime(0.0001, when + 0.025);
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = Math.min(5200, freq * 7 + 900);
+  bp.Q.value = 0.9;
+  nsrc.connect(bp);
+  bp.connect(ng);
+  ng.connect(noteMaster);
+  nsrc.start(when);
+  nsrc.stop(when + 0.06);
+  sources.push(nsrc);
+
+  const note = { master: noteMaster, sources, gains: envGains };
+  activeNotes.add(note);
+  sources[0].onended = () => {
+    activeNotes.delete(note);
+    try { noteMaster.disconnect(); } catch (_) {}
+  };
+}
+
+function stopAllVoices() {
+  const now = audioCtx ? audioCtx.currentTime : 0;
+  for (const n of activeNotes) {
+    for (const s of n.sources) {
+      try { s.stop(); } catch (_) {}
+    }
+    for (const g of n.gains) {
+      try { g.gain.cancelScheduledValues(now); } catch (_) {}
+      try { g.gain.setValueAtTime(0.0001, now); } catch (_) {}
+    }
+    try { n.master.disconnect(); } catch (_) {}
+  }
+  activeNotes.clear();
+}
+
+function playExerciseSound(ex) {
+  try {
+    stopAllVoices();
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime + 0.03;
+    ex.notes.forEach(n => {
+      playPianoNote(midiToFreq(abcToMidi(n.abc, n.pitchAcc)), now);
+    });
+  } catch (_) {}
+}
+
+function syncSoundUI() {
+  if (settings.sound) {
+    if (exercise) playExerciseSound(exercise);
+  } else {
+    stopAllVoices();
+  }
+}
+
+function updateSoundToggleUI() {
+  soundToggleBtn.textContent = settings.sound ? '🔊 声音' : '🔇 声音';
+  soundToggleBtn.classList.toggle('active', settings.sound);
+  soundToggleBtn.title = settings.sound ? '关闭钢琴音' : '开启钢琴音（出题时自动播放）';
+}
+
+function toggleSound() {
+  settings.sound = !settings.sound;
+  if (!settings.sound && settings.hideStaff) {
+    settings.hideStaff = false;
+    if (exercise) renderStaff(exercise);
+  }
+  updateSoundToggleUI();
+  if (settings.sound) {
+    if (exercise) playExerciseSound(exercise);
+  } else {
+    stopAllVoices();
+  }
+}
+
 // ═══════════════ event binding ═══════════════
 submitBtn.addEventListener('click', submit);
+soundToggleBtn.addEventListener('click', toggleSound);
 answerInput.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.repeat) {
     e.preventDefault();
@@ -588,6 +876,7 @@ function init() {
     return;
   }
   setAnswerMode('solfege');
+  updateSoundToggleUI();
   loadExercise();
 }
 
