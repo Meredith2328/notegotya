@@ -65,6 +65,7 @@ const modeLetter  = document.getElementById('modeLetter');
 let answerMode = 'solfege'; // 'solfege' | 'letter'
 let exercise  = null;       // { clef, key, notes:[{abc, letter, extraAcc, pitchAcc}] }
 let phase     = 'answering';
+let lastResult = null;      // { userAnswer, correct, isTimeout } for re-rendering feedback
 let timerId   = null;
 let timerStart = 0;
 let timerDuration = 10000; // overridden by settings
@@ -160,6 +161,7 @@ function randomExtraAccidental(letter, keySig) {
 const CHORD_INTERVALS = [2, 3, 3, 3, 3, 4, 4, 5, 5, 6];
 
 function pickNotes(pool, count) {
+  count = Math.min(count, pool.length);
   if (count === 1) {
     return [pool[randInt(0, pool.length - 1)]];
   }
@@ -291,6 +293,7 @@ function check(raw) {
 function setPhase(p) {
   phase = p;
   if (p === 'answering') {
+    lastResult = null;
     submitBtn.textContent = '提交';
     answerInput.disabled = false;
     answerInput.value = '';
@@ -378,6 +381,7 @@ function revealAnswer(userAnswer, isTimeout) {
   submitBtn.textContent = '下一题';
   if (settings.hideStaff) renderStaff(exercise);
   const correct = !isTimeout && userAnswer !== '' && check(userAnswer);
+  lastResult = { userAnswer, correct, isTimeout };
   showFeedback(userAnswer, correct, isTimeout);
   updateScore(correct);
 }
@@ -415,8 +419,9 @@ function setAnswerMode(mode) {
     answerInput.placeholder = '例: C# E G';
   }
   if (phase === 'showing_result') {
-    const correctAns = answerString(exercise, answerMode);
-    feedback.textContent = feedback.textContent.replace(/：.+/, '：' + correctAns);
+    if (lastResult) {
+      showFeedback(lastResult.userAnswer, lastResult.correct, lastResult.isTimeout);
+    }
   }
 }
 
